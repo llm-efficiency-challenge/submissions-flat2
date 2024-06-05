@@ -1,0 +1,27 @@
+FROM nvcr.io/nvidia/cuda:11.8.0-devel-ubuntu22.04
+
+RUN apt-get update -y -o Acquire::http::No-Cache=True 
+RUN apt-get install -y git wget
+RUN apt-get install -y python3-virtualenv 
+RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash \
+    && apt-get install -y git-lfs \
+    && git lfs install
+RUN pip3 install huggingface_hub  
+
+WORKDIR /workspace
+COPY down_load_train.py .
+COPY measurement.json .
+COPY push_to_hf.py .
+COPY train-00000-of-00018-60349854e9c475bb.parquet .
+RUN pip3 install -U --no-cache-dir git+https://github.com/facebookresearch/llama-recipes.git@main
+
+RUN python3 down_load_train.py
+
+
+RUN git clone https://github.com/turboderp/exllamav2.git
+RUN pip3 install --no-cache-dir exllamav2
+RUN mkdir -p /workspace/exl2_tmp
+
+COPY start_train.sh .
+CMD ["bash","start_train.sh"]
+

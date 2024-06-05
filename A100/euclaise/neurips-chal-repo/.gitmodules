@@ -1,0 +1,3 @@
+[submodule "SlimTrainer"]
+	path = SlimTrainer
+	url = https://github.com/euclaise/SlimTrainer.git

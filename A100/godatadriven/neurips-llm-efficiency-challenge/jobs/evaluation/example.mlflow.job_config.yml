@@ -1,0 +1,18 @@
+version: v6
+image: europe-west4-docker.pkg.dev/neurips-llm-eff-challenge-2023/container-registry-neurips-2023/helm
+image_tag: latest
+compute_config:
+  cpu: "4"
+  memory: "16Gi"
+helm:
+  max_eval_instances: 30
+  num_threads: 2
+tracking_config:
+  tracking_uri: http://10.164.0.15:5000
+  experiment_name: eval-test-debug
+  # See https://yaml-multiline.info/. Only '>' is supported here.
+  description: >
+    This evaluation runs HELM on a Mistral 7B model.
+  tags:
+    creator: Jasper
+    lifecycle: experimental

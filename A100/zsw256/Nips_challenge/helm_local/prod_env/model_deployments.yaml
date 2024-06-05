@@ -1,0 +1,28 @@
+model_deployments:
+
+  - name: neurips/qwen_14b
+    tokenizer_name: neurips/qwen_14b
+    max_sequence_length: 2048
+    client_spec:
+      class_name: "helm.proxy.clients.http_model_client.HTTPModelClient"
+      args: {
+        base_url: "http://localhost:8080"
+      }
+
+  - name: neurips/llama2_13b_merge
+    tokenizer_name: neurips/llama2_13b_merge
+    max_sequence_length: 2048
+    client_spec:
+      class_name: "helm.proxy.clients.http_model_client.HTTPModelClient"
+      args: {
+        base_url: "http://localhost:8080"
+      }
+
+  - name: neurips/qwen_14b_merge
+    tokenizer_name: neurips/qwen_14b_merge
+    max_sequence_length: 2048
+    client_spec:
+      class_name: "helm.proxy.clients.http_model_client.HTTPModelClient"
+      args: {
+        base_url: "http://localhost:8080"
+      }

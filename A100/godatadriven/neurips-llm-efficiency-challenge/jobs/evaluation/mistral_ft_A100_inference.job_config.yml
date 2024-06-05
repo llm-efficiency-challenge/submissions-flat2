@@ -1,0 +1,19 @@
+version: v1
+image: europe-west4-docker.pkg.dev/neurips-llm-eff-challenge-2023/container-registry-neurips-2023/evaluation
+image_tag: latest
+model: mistralai/Mistral-7B-v0.1
+load_in_8bit: true
+torch_dtype: bfloat16
+tokenizer_config:
+  use_fast: true
+compute_config:
+  accelerator: nvidia-tesla-a100
+  cpu: "4"
+  memory: "40Gi"
+#huggingface_token_secret_name: projects/750004521723/secrets/JASPER-HUGGINGFACE-TOKEN/versions/1
+mlflow_artifact_config:
+  mlflow_tracking_uri: http://10.164.0.15:5000
+  run_id: 1c34595f2ffa4cd5bdc9e98c1d206dda
+  artifact_path: final_model
+  model_directory: ''
+  download_directory: .tmp/1c34595f2ffa4cd5bdc9e98c1d206dda

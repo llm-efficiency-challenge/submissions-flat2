@@ -1,0 +1,11 @@
+{
+  "merge_data": {
+    "file_name": "merged_data.json",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output",
+      "history": "history"
+    }
+  }
+}

@@ -1,0 +1,96 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: training-neurips-{{ job_name_suffix }}
+  namespace: default
+spec:
+  ttlSecondsAfterFinished: 86400 # 1 day
+  backoffLimit: 0
+  template:
+    spec:
+      serviceAccountName: kubernetes
+      {% if accelerator is not none %}
+      nodeSelector:
+        # iam.gke.io/gke-metadata-server-enabled: "true" # Only for workload identity:
+        # See: https://cloud.google.com/kubernetes-engine/docs/how-to/autopilot-gpus
+        cloud.google.com/gke-accelerator: {{ accelerator }}
+      {% endif %}
+      # From: https://getindata.com/blog/deploy-open-source-llm-private-cluster-hugging-face-gke-autopilot/
+      initContainers:
+      - name: init
+        image: google/cloud-sdk:slim
+        # Output path: /scratch/<GS-FOLDER-NAME>
+        command: ["sh", "-c", "gcloud alpha storage cp {{ path_to_data_remote }} {{ path_to_data_local }}"]
+        volumeMounts:
+        - mountPath: "/scratch"
+          name: scratch-volume
+      containers:
+      - name: training
+        image: {{ image }}
+        command: ["cajajejo", "models", "finetune-model"]
+        args: ["/etc/configs/training_config.yml", "--path-to-data", "{{ path_to_data_local }}"]
+        env:
+        - name: CONFIG_PATH_GIT_REPO
+          value: "{{ config_path_git_repo }}"
+        - name: JOB_NAME
+          value: "eval-neurips-{{ job_name_suffix }}"
+        - name: TRANSFORMERS_CACHE # Download to ephemeral scratch space
+          value: "/scratch/transformers/.cache"
+        {% if config_version is not none %}
+        - name: CONFIG_VERSION
+          value: "{{ config_version }}"
+        {% else %}
+        - name: CONFIG_VERSION
+          value: "Unknown"
+        {% endif %}
+        resources:
+          {% if accelerator is not none %}
+          limits:
+            nvidia.com/gpu: "1"
+          {% endif %}
+          requests:
+            cpu: "{{ cpu }}"
+            memory: "{{ memory }}"
+        volumeMounts:
+        - name: configs-volume
+          mountPath: /etc/configs
+        - mountPath: "/scratch"
+          name: scratch-volume
+      volumes:
+        - name: configs-volume
+          configMap:
+            name: training-config
+        - name: scratch-volume
+          ephemeral:
+            volumeClaimTemplate:
+              metadata:
+                labels:
+                  type: scratch-volume
+              spec:
+                accessModes: [ "ReadWriteOnce" ]
+                storageClassName: "ssd"
+                resources:
+                  requests:
+                    storage: 300Gi # TODO: make this configurable
+      restartPolicy: "Never"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: training-config
+  namespace: default
+data:
+  training_config.yml: |
+    {{ config | indent(4) }}
+---
+# See: https://kubernetes.io/docs/concepts/storage/ephemeral-volumes/#generic-ephemeral-volumes
+#  and: https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/gce-pd-csi-driver#using_the_for_linux_clusters
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ssd
+provisioner: pd.csi.storage.gke.io
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+parameters:
+  type: pd-balanced # TODO: make configurable - pd-ssd for faster storage

@@ -1,0 +1,56 @@
+repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.4.0
+  hooks:
+  - id: trailing-whitespace
+  - id: end-of-file-fixer
+  - id: check-yaml
+    args: [--allow-multiple-documents]
+      # Having mixed line endings in your repository will at some point cause trouble
+  - id: mixed-line-ending
+    args: [--fix=lf]
+        # Allow different line ending for some file types
+    exclude: \.(ps1)$
+
+- repo: local
+  hooks:
+    - id: jupyter-nb-clear-output
+      name: jupyter-nb-clear-output
+      files: \.ipynb$
+      stages: [commit]
+      language: python
+      additional_dependencies:
+        - jupyter
+      args: []
+      entry: jupyter nbconvert --ClearOutputPreprocessor.enabled=True --ClearMetadataPreprocessor.enabled=True --inplace
+
+- repo: https://github.com/psf/black
+  rev: 23.7.0
+  hooks:
+  - id: black
+
+- repo: https://github.com/charliermarsh/ruff-pre-commit
+  rev: v0.0.284
+  hooks:
+  - id: ruff
+    args: [.]
+
+- repo: https://github.com/terraform-docs/terraform-docs
+  rev: v0.16.0
+  hooks:
+  - id: terraform-docs-go
+    always_run: true
+    pass_filenames: false
+    args:
+    - infra
+
+- repo: https://github.com/antonbabenko/pre-commit-terraform
+  rev: v1.81.2
+  hooks:
+  - id: terraform_fmt
+    pass_filenames: false
+    always_run: true
+    args:
+    - --args=-recursive
+  # - id: terraform_validate
+  #   exclude: modules/kubernetes.workload_identity_existing_gsa/[^/]+$

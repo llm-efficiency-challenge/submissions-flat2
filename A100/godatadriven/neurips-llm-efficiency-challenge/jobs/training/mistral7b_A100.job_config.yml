@@ -1,0 +1,73 @@
+bits_and_bytes_config:
+  bnb_4bit_config:
+    bnb_4bit_compute_dtype: bfloat16
+    bnb_4bit_quant_type: nf4
+    bnb_4bit_use_double_quant: true
+  load_in_4bit: true
+  load_in_8bit: false
+compute_config:
+  accelerator: nvidia-tesla-a100
+  cpu: '8'
+  memory: 60Gi
+huggingface_token_secret_name: projects/750004521723/secrets/JASPER-HUGGINGFACE-TOKEN/versions/1
+image: europe-west4-docker.pkg.dev/neurips-llm-eff-challenge-2023/container-registry-neurips-2023/training
+image_tag: latest
+lora_config:
+  bias: none
+  lora_alpha: 16
+  lora_dropout: 0.05
+  r: 16
+  target_modules:
+  - down_proj
+  - up_proj
+  - gate_proj
+  task_type: CAUSAL_LM
+model: mistralai/Mistral-7B-v0.1
+seed: 987235
+sft_trainer_config:
+  max_seq_length: 2048
+tokenizer_config:
+  use_fast: true
+tracking_config:
+  description: >
+    This training run finetunes a Mistral 7B base model on our own custom dataset.
+  experiment_name: training
+  run_name: null
+  tags:
+    creator: Jasper
+    datasets: null
+    lifecycle: experimental
+    model: Mistral-7B
+  tracking_uri: http://10.164.0.15:5000
+train_arguments_config:
+  bf16: false
+  dataloader_num_workers: 6
+  dataloader_pin_memory: true
+  eval_accumulation_steps: 8
+  eval_steps: 200
+  evaluation_strategy: steps
+  fp16: false
+  gradient_accumulation_steps: 16
+  gradient_checkpointing: true
+  group_by_length: false
+  learning_rate: 0.0003
+  logging_steps: 100
+  logging_strategy: steps
+  lr_scheduler_type: cosine
+  max_grad_norm: 0.3
+  max_steps: -1
+  num_train_epochs: 1
+  optim: paged_adamw_8bit
+  output_dir: out
+  per_device_eval_batch_size: 2
+  per_device_train_batch_size: 4
+  save_steps: 200
+  save_strategy: steps
+  save_total_limit: 3
+  tf32: true
+  torch_compile: false
+  warmup_steps: 100
+training_data_config:
+  path_to_data: gs://data-neurips-2023/data/friendly-worm/87adc2d5244821c7d6d8a7d3678f970e9bde015fc811027cff0207ca5822bf20/sft_train_shuffled_reduced_all_ds.jsonl
+  test_size: 0.05
+version: v2

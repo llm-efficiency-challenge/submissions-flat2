@@ -1,0 +1,3 @@
+- Use native Helm commands since debugging using sh is difficult
+- Name all models 'model' on disk so that it's easier to re-use the config
+- Generate suite name in script based on run name etc.

@@ -1,0 +1,2 @@
+local_data_path: data
+remote: gs://data-neurips-2023/data

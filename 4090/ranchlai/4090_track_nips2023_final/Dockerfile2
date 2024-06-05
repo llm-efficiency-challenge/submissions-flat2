@@ -1,0 +1,57 @@
+FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-devel
+
+# VOLUME /workspace
+
+WORKDIR /workspace
+
+COPY ./src/* /workspace/
+RUN chmod 1777 /tmp
+
+# use only in China
+# RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+
+RUN apt-get update && apt-get install -y git
+# Install any needed packages specified in requirements.txt that come from lit-gpt plus some optionals
+RUN pip install huggingface_hub sentencepiece tokenizers bitsandbytes==0.41.1 scipy
+
+
+RUN export PIP_DEFAULT_TIMEOUT=10000
+RUN apt-get update  && apt-get install -y git python3-virtualenv wget  git-lfs
+
+# Setup server requriements
+RUN pip install --no-cache-dir --upgrade -r fast_api_requirements.txt
+RUN pip install optimum
+RUN pip install auto-gptq
+RUN pip install transformers_stream_generator einops tiktoken loguru
+RUN pip install transformers==4.33.1 --upgrade
+
+# install peft
+RUN git clone https://github.com/ranchlai/peft.git \
+&& cd peft && git reset --hard 69665f24e98dc5f20a430637a31f196158b6e0da \
+&& pip install -e . && cd ..
+
+#  only for training.
+# RUN git clone https://github.com/ranchlai/transformers.git
+# cd transformers
+# git reset --hard 4a28600a08fd8055c22d79361154666a35ca701d
+# RUN pip install -e .
+# cd ..
+
+RUN ls -la
+
+RUN git clone https://huggingface.co/kl1996/qwen-gptq 
+WORKDIR /workspace/qwen-gptq/
+RUN git lfs pull
+
+WORKDIR /workspace
+RUN git clone https://huggingface.co/kl1996/qwen-v12a-15000 ./qwen_lora
+WORKDIR /workspace/qwen_lora/
+RUN git lfs pull
+
+# # RUN find /workspace/
+
+WORKDIR /workspace
+
+# RUN ls -la
+# # Run the server
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]

@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+pydantic
+transformers>=4.34
+peft
+torch

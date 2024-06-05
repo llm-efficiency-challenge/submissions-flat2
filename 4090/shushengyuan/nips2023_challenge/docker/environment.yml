@@ -1,0 +1,19 @@
+name: pam
+ 
+channels:
+  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge
+  - defaults
+  - pytorch
+  - nvidia
+  - huggingface
+ 
+dependencies:
+  - python=3.10
+  - ninja
+  - cudatoolkit-dev
+  - pytest
+  - pytorch-cuda=11.7
+  - pyyaml
+  - datasets
+
+ 

@@ -1,0 +1,139 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: eval-neurips-{{ job_name_suffix }}
+  namespace: default
+spec:
+  ttlSecondsAfterFinished: 86400 # 1 day
+  backoffLimit: 0
+  template:
+    spec:
+      serviceAccountName: kubernetes
+      {% if accelerator is not none %}
+      nodeSelector:
+        # iam.gke.io/gke-metadata-server-enabled: "true" # Only for workload identity:
+        # See: https://cloud.google.com/kubernetes-engine/docs/how-to/autopilot-gpus
+        cloud.google.com/gke-accelerator: {{ accelerator }}
+      {% endif %}
+      # From: https://getindata.com/blog/deploy-open-source-llm-private-cluster-hugging-face-gke-autopilot/
+      {% if mlflow_tracking_uri is not none %}
+      initContainers:
+      - name: init
+        image: europe-west4-docker.pkg.dev/neurips-llm-eff-challenge-2023/container-registry-neurips-2023/mlflow-skinny-gcp:da958c6a7e
+        # Output path: /scratch/<GS-FOLDER-NAME>
+        env:
+        - name: MLFLOW_TRACKING_URI
+          value: "{{ mlflow_tracking_uri }}"
+        command: ["mlflow"]
+        args: ["artifacts", "download", "-r", "{{ model_run_id }}", "-a", "{{ model_artifact_path }}", "-d", "/scratch"]
+        volumeMounts:
+        - mountPath: "/scratch"
+          name: scratch-volume
+      {% endif %}
+      containers:
+      - name: api
+        image: europe-west4-docker.pkg.dev/neurips-llm-eff-challenge-2023/container-registry-neurips-2023/evaluation:latest
+        command: ["cajajejo", "api-server", "start"]
+        {% if mlflow_tracking_uri is none %}
+        args: ["/etc/configs/inference_config.yml"]
+        {% else %}
+        args: ["/etc/configs/inference_config.yml", "--path-to-adapter", "/scratch/{{ model_artifact_path }}"]
+        {% endif %}
+        env:
+        - name: JOB_NAME
+          value: "eval-neurips-{{ job_name_suffix }}"
+        - name: TRANSFORMERS_CACHE # Download to ephemeral scratch space
+          value: "/scratch/transformers/.cache"
+        resources:
+          {% if accelerator is not none %}
+          limits:
+            nvidia.com/gpu: "1"
+          {% endif %}
+          requests:
+            cpu: "{{ api_cpu }}"
+            memory: "{{ api_memory }}"
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+        - name: configs-volume
+          mountPath: /etc/configs
+        - mountPath: "/scratch"
+          name: scratch-volume
+      - name: helm
+        image: {{ image }}
+        command: ["cajajejo", "models", "helm-run"]
+        args: [
+          "/etc/configs/eval_config.yml",
+          "/etc/configs/run_specs.conf",
+          "/scratch/helm",
+          "--job-name",
+          "eval-neurips-{{ job_name_suffix }}",
+          "--api-url", "http://localhost:8080",
+          "--skip-sanity-checks",
+          "--ignore-helm-errors"
+        ]
+        env:
+        - name: JOB_NAME
+          value: "eval-neurips-{{ job_name_suffix }}"
+        {% if config_version is not none %}
+        - name: CONFIG_VERSION
+          value: "{{ config_version }}"
+        {% else %}
+        - name: CONFIG_VERSION
+          value: "Unknown"
+        {% endif %}
+        resources:
+          {% if accelerator is not none %}
+          limits:
+            nvidia.com/gpu: "0"
+          {% endif %}
+          requests:
+            cpu: "{{ eval_cpu }}"
+            memory: "{{ eval_memory }}"
+        volumeMounts:
+        - name: configs-volume
+          mountPath: /etc/configs
+        - mountPath: "/scratch"
+          name: scratch-volume
+      volumes:
+        - name: configs-volume
+          configMap:
+            name: eval-configs
+        - name: scratch-volume
+          ephemeral:
+            volumeClaimTemplate:
+              metadata:
+                labels:
+                  type: scratch-volume
+              spec:
+                accessModes: [ "ReadWriteOnce" ]
+                storageClassName: "ssd"
+                resources:
+                  requests:
+                    storage: 50Gi # TODO: make this configurable
+      restartPolicy: "Never"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: eval-configs
+  namespace: default
+data:
+  inference_config.yml: |
+    {{ inf_config | indent(4) }}
+  eval_config.yml: |
+    {{ eval_config | indent(4) }}
+  run_specs.conf: |
+    {{ run_specs | indent(4) }}
+---
+# See: https://kubernetes.io/docs/concepts/storage/ephemeral-volumes/#generic-ephemeral-volumes
+#  and: https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/gce-pd-csi-driver#using_the_for_linux_clusters
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ssd
+provisioner: pd.csi.storage.gke.io
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+parameters:
+  type: pd-balanced # TODO: make configurable - pd-ssd for faster storage

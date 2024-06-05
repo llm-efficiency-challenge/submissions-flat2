@@ -1,0 +1,45 @@
+# Determined Image
+FROM determinedai/environments:cuda-11.3-pytorch-1.10-tf-2.8-gpu-0.19.4
+# Determine the base image from NVIDIA's official CUDA image
+
+# Some important environment variables in Dockerfile
+ARG DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Shanghai LANG=C.UTF-8 LC_ALL=C.UTF-8 PIP_NO_CACHE_DIR=1
+
+ENV PATH="/opt/conda/bin:${PATH}"
+
+# Custom Configuration
+RUN sed -i  "s/archive.ubuntu.com/mirrors.ustc.edu.cn/g" /etc/apt/sources.list && \
+    sed -i  "s/security.ubuntu.com/mirrors.ustc.edu.cn/g" /etc/apt/sources.list && \
+    rm -f /etc/apt/sources.list.d/* && \
+    apt-get update && \
+    apt-get -y install tzdata tmux && \
+    apt-get -y install git-lfs && \
+    apt-get clean && \
+    apt-get -y install watch && \
+    apt-get -y install libopenmpi-dev 
+
+# Copy the environment.yml and pip_requirements.txt files
+COPY environment.yml /tmp/environment.yml
+COPY pip_requirements.txt /tmp/pip_requirements.txt
+
+# Update conda environment and install required packages
+RUN conda env update --name nips2023 --file /tmp/environment.yml
+RUN conda clean --all --force-pkgs-dirs --yes
+RUN eval "$(conda shell.bash hook)" && \
+    conda activate nips2023 && \
+    pip config set global.index-url https://mirrors.bfsu.edu.cn/pypi/web/simple &&\
+    pip install --upgrade pip &&\
+    pip install --requirement /tmp/pip_requirements.txt -i https://pypi.mirrors.ustc.edu.cn/simple --trusted-host=pypi.mirrors.ustc.edu.cn &&\
+    pip install flash-attn --no-build-isolation && \
+    pip install -U bitsandbytes -i https://pypi.tuna.tsinghua.edu.cn/simple some-package && \
+    pip install git+https://github.com/huggingface/transformers
+
+
+RUN chmod 777 -R /opt/conda/envs/nips2023
+# RUN conda init bash &&\
+#     bash &&\
+#     conda activate nips2023 &&\
+#     echo 'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/conda/envs/nips2023/lib' >> ~/.bashrc
+
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/conda/envs/nips2023/lib

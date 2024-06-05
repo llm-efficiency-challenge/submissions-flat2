@@ -1,0 +1,67 @@
+# Use an official Python runtime as a parent image
+# other options in https://github.com/orgs/pytorch/packages/container/pytorch-nightly/versions?filters%5Bversion_type%5D=tagged
+# Lit-GPT requires current nightly (future 2.1) for the latest attention changes
+FROM ghcr.io/pytorch/pytorch-nightly:c69b6e5-cu11.8.0
+
+# Set the working directory in the container to /submission
+WORKDIR /submission
+
+# Copy the specific file into the container at /submission
+COPY /NeurIPS_LLM_Nitanda_Lab/ /submission/
+
+# Setup server requriements
+COPY ./fast_api_requirements.txt fast_api_requirements.txt
+RUN pip install --no-cache-dir --upgrade -r fast_api_requirements.txt
+
+# Install any needed packages specified in requirements.txt that come from lit-gpt
+RUN apt-get update && apt-get install -y git
+RUN pip install -r requirements.txt huggingface_hub sentencepiece tokenizers bitsandbytes scipy
+
+ENV HUGGINGFACE_TOKEN="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"
+# get llama2 weights: https://github.com/Lightning-AI/lit-gpt/blob/main/tutorials/download_llama_2.md
+RUN python scripts/download.py --repo_id meta-llama/Llama-2-13b-hf --access_token ${HUGGINGFACE_TOKEN}
+RUN python scripts/convert_hf_checkpoint.py --checkpoint_dir checkpoints/meta-llama/Llama-2-13b-hf
+
+# Prepare dataset for each model
+RUN python scripts/prepare_customdata.py \
+    --checkpoint_dir "checkpoints/meta-llama/Llama-2-13b-hf" \
+    --destination_path data/limaoasst-Llama-2-13b-hf \
+    --access_token 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 \
+    --datasetlist "['lima', 'oasst']" \
+    --max_seq_length 2048
+
+# Finetune model by lora
+ENV CUDA_VISIBLE_DEVICES=0
+RUN python finetune/lora_swa.py \
+--data_dir data/limaoasst-Llama-2-13b-hf \
+--checkpoint_dir checkpoints/meta-llama/Llama-2-13b-hf \
+--out_dir out/Llama-2-13b-hf/ \
+--precision "bf16-true" \
+--quantize "bnb.nf4-dq" \
+--optim_name "AdamW" \
+--max_iters 50000 \
+--log_interval 100 \
+--batch_size 128 \
+--micro_batch_size 1 \
+--learning_rate 0.0003 \
+--weight_decay 0.001 \
+--lr_type "Fix"
+
+# Convert lit-gpt model format
+RUN python scripts/merge_r8a16.py \
+--checkpoint_dir checkpoints/meta-llama/Llama-2-13b-hf \
+--lora_path out/Llama-2-13b-hf/*ave*.pth \
+--out_dir out/Llama-2-13b-hf
+
+# Copy *.json toknizer.model
+RUN cp checkpoints/meta-llama/Llama-2-13b-hf/*.json \
+out/Llama-2-13b-hf
+RUN cp checkpoints/meta-llama/Llama-2-13b-hf/tokenizer.model \
+out/Llama-2-13b-hf
+
+# Copy over single file server
+COPY ./main_finetune.py /submission/main.py
+COPY ./helper.py /submission/helper.py
+COPY ./api.py /submission/api.py
+# Run the server
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]

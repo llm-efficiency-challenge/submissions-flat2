@@ -1,0 +1,66 @@
+version: v2
+image: europe-west4-docker.pkg.dev/neurips-llm-eff-challenge-2023/container-registry-neurips-2023/training
+image_tag: latest
+model: EleutherAI/pythia-410m
+seed: 763528
+training_data_config:
+  path_to_data: gs://data-neurips-2023/data/fresh-otter/2a572f8114d17cf96449a1ae7ddda68b589a865bfb9f115c4a8e7d76230f03fa/sft_train_shuffled_whelm.jsonl
+  test_size: 0.05
+sft_trainer_config:
+  max_seq_length: 2048
+compute_config:
+  accelerator: nvidia-tesla-t4
+  cpu: "6"
+  memory: 32Gi
+bits_and_bytes_config:
+  load_in_4bit: true
+  bnb_4bit_config:
+    bnb_4bit_use_double_quant: true
+    bnb_4bit_quant_type: nf4
+    bnb_4bit_compute_dtype: "bfloat16"
+lora_config:
+  target_modules:
+    - query_key_value
+  r: 16
+  lora_alpha: 16
+  lora_dropout: 0.05
+  bias: none
+  task_type: CAUSAL_LM
+tokenizer_config:
+  use_fast: true
+train_arguments_config:
+  output_dir: out
+  save_strategy: steps
+  save_steps: 100
+  save_total_limit: 3
+  num_train_epochs: 1
+  evaluation_strategy: steps
+  logging_strategy: steps
+  eval_steps: 100
+  logging_steps: 100
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 16
+  gradient_checkpointing: true
+  per_device_eval_batch_size: 2
+  eval_accumulation_steps: 8
+  learning_rate: 0.0004
+  lr_scheduler_type: cosine
+  max_grad_norm: 0.3
+  warmup_steps: 100
+  optim: paged_adamw_8bit
+  dataloader_pin_memory: true
+  dataloader_num_workers: 6
+  fp16: false
+  tf32: false
+  group_by_length: false
+  torch_compile: false
+tracking_config:
+  tracking_uri: http://10.164.0.15:5000
+  experiment_name: training
+  # See https://yaml-multiline.info/. Only '>' is supported here.
+  description: >
+    This training run finetunes a Pythia-410m base model on our own custom dataset.
+  tags:
+    model: Pythia-410m
+    creator: Jasper
+    lifecycle: experimental

@@ -1,0 +1,72 @@
+version: v2
+image: europe-west4-docker.pkg.dev/neurips-llm-eff-challenge-2023/container-registry-neurips-2023/training
+image_tag: latest
+model: adept/persimmon-8b-base
+seed: 784332
+huggingface_token_secret_name: projects/750004521723/secrets/JASPER-HUGGINGFACE-TOKEN/versions/1
+training_data_config:
+  path_to_data: gs://data-neurips-2023/data/malachite-avocet/45ee526a165a74e6f893eb17500401d5b320940ceeb0919aefb8e91d288c4f56/sft_train_shuffled_reduced_all_ds.jsonl
+  test_size: 0.05
+sft_trainer_config:
+  max_seq_length: 2048
+compute_config:
+  accelerator: nvidia-tesla-a100
+  cpu: "8"
+  memory: 60Gi
+bits_and_bytes_config:
+  load_in_4bit: true
+  bnb_4bit_config:
+    bnb_4bit_use_double_quant: true
+    bnb_4bit_quant_type: nf4
+    bnb_4bit_compute_dtype: bfloat16
+lora_config:
+  # See https://arxiv.org/pdf/2110.04366.pdf, p.8
+  target_modules:
+    - query_key_value
+  r: 8
+  lora_alpha: 16
+  lora_dropout: 0.05
+  bias: none
+  task_type: CAUSAL_LM
+tokenizer_config:
+  use_fast: true
+train_arguments_config:
+  output_dir: out
+  save_strategy: steps
+  save_steps: 200
+  save_total_limit: 3
+  num_train_epochs: 1
+  evaluation_strategy: steps
+  logging_strategy: steps
+  eval_steps: 200
+  logging_steps: 100
+  # virtual batch size = 4 * 16 = 64.
+  # See https://huggingface.co/docs/transformers/perf_train_gpu_one#batch-size-choice
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 16
+  gradient_checkpointing: true
+  per_device_eval_batch_size: 1
+  eval_accumulation_steps: 8
+  learning_rate: 0.0003
+  lr_scheduler_type: cosine
+  max_grad_norm: 0.3
+  warmup_steps: 100
+  # See: https://huggingface.co/docs/transformers/perf_train_gpu_one#8bit-adam
+  optim: paged_adamw_8bit
+  dataloader_pin_memory: true
+  dataloader_num_workers: 6
+  # See: https://huggingface.co/docs/transformers/perf_train_gpu_one#tf32
+  tf32: true
+  group_by_length: false # faster but produces weird loss curves
+  # See: https://huggingface.co/docs/transformers/perf_train_gpu_one#using-torchcompile
+  torch_compile: false # no idea if that will work
+tracking_config:
+  tracking_uri: http://10.164.0.15:5000
+  experiment_name: training
+  # See https://yaml-multiline.info/. Only '>' is supported here.
+  description: >
+    This training run finetunes a LLama2 7B base model on our own custom dataset.
+  tags:
+    model: LLama2-7B
+    creator: Jasper
+    lifecycle: experimental

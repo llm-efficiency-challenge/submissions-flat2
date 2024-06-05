@@ -1,0 +1,4 @@
+tiktoken
+einops
+transformers_stream_generator==0.0.4
+peft==0.5.0

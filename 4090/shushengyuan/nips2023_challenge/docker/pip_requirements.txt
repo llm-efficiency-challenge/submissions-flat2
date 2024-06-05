@@ -1,0 +1,24 @@
+--extra-index-url https://download.pytorch.org/whl/cu118
+# torch==2.0.1+cu118
+# torchvision==0.15.2+cu118
+# torchaudio==2.0.2
+pandas
+tensorboard
+fairscale
+sentencepiece
+gradio
+open_clip_torch
+fire
+packaging
+pyyaml
+pathlib
+Ninja
+setuptools
+
+peft==0.4.0
+accelerate==0.21.0
+einops==0.6.1
+evaluate==0.4.0
+scikit-learn==1.2.2
+sentencepiece
+wandb

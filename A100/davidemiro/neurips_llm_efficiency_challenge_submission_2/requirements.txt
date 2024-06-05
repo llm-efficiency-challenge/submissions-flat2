@@ -1,0 +1,17 @@
+datasets
+transformers
+accelerate
+evaluate
+peft
+deepspeed
+ninja
+flash-attn
+peft
+bitsandbytes
+trl
+optimum
+protobuf
+xformers
+wandb
+einops
+sentencepiece
